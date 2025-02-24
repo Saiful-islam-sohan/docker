@@ -36,21 +36,30 @@ jobs:
       - name: Run Tests
         run: php artisan test
 
-    deploy:
+  deploy:
     name: Deploy
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: production-files
-          path: ./build
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@master
         with:
-          github_token: ${{ secrets.TOKEN }}
-          publish_dir: ./build
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /var/www/your-laravel-project
+            git pull origin main
+            composer install --no-interaction --prefer-dist --no-progress
+            php artisan migrate --force
+            php artisan cache:clear
+            php artisan config:clear
+            php artisan queue:restart
+            php artisan storage:link
+            php artisan optimize
+            sudo systemctl restart nginx
